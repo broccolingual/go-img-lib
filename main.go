@@ -12,17 +12,14 @@ import (
 	"time"
 )
 
-type Img struct {
-	Src  image.Image
-	H, W int
-}
+type imgArray [][]color.Color
 
 type TimeData struct {
 	Elapsed int64
 	Name    string
 }
 
-func LoadImage(path string) image.Image {
+func LoadRGBAImage(path string) *image.RGBA {
 	f, _ := os.Open(path)
 	defer f.Close()
 
@@ -31,7 +28,7 @@ func LoadImage(path string) image.Image {
 		log.Println(err)
 	}
 
-	return src
+	return src.(*image.RGBA)
 }
 
 func SaveImage(path string, img image.Image) {
@@ -42,6 +39,58 @@ func SaveImage(path string, img image.Image) {
 	defer f.Close()
 
 	png.Encode(f, img)
+}
+
+func ConvertArray(src *image.RGBA) (array imgArray) {
+	size := src.Bounds().Size()
+	for i := 0; i < size.X; i++ {
+		var y []color.Color
+		for j := 0; j < size.Y; j++ {
+			y = append(y, src.At(i, j))
+		}
+		array = append(array, y)
+	}
+	return
+}
+
+func ConvertGrayImage(array imgArray) *image.Gray {
+	xlen, ylen := len(array), len(array[0])
+	rect := image.Rect(0, 0, xlen, ylen)
+	dst := image.NewGray(rect)
+	for x := 0; x < xlen; x++ {
+		for y := 0; y < ylen; y++ {
+			dst.Set(x, y, array[x][y])
+		}
+	}
+	return dst
+}
+
+func ConvertRGBAImage(array imgArray) *image.RGBA {
+	xlen, ylen := len(array), len(array[0])
+	rect := image.Rect(0, 0, xlen, ylen)
+	dst := image.NewRGBA(rect)
+	for x := 0; x < xlen; x++ {
+		for y := 0; y < ylen; y++ {
+			dst.Set(x, y, array[x][y])
+		}
+	}
+	return dst
+}
+
+func (src imgArray) ToGrayscale() (dst imgArray) {
+	xlen, ylen := len(src), len(src[0])
+	dst = make(imgArray, xlen)
+	for i := 0; i < len(dst); i++ {
+		dst[i] = make([]color.Color, ylen)
+	}
+	for x := 0; x < xlen; x++ {
+		for y := 0; y < ylen; y++ {
+			pix := src[x][y].(color.RGBA)
+			gray := uint8((float64(pix.R) + float64(pix.G) + float64(pix.B)) / 3.0)
+			dst[x][y] = color.RGBA{gray, gray, gray, pix.A}
+		}
+	}
+	return
 }
 
 func Gray(src image.Image) *image.Gray {
@@ -156,7 +205,7 @@ func SubPixel(src1 *image.Gray, src2 *image.Gray) *image.Gray {
 
 func main() {
 	path := "img/lenna.png"
-	img := LoadImage(path)
+	img := LoadRGBAImage(path)
 	timeData := []TimeData{}
 	iteration := 10
 	fmt.Printf("%s (%dx%d)\nAverage Elapsed Time(Iteration: %d)\n", path, img.Bounds().Dx(), img.Bounds().Dy(), iteration)
@@ -170,6 +219,15 @@ func main() {
 	imgGray := Gray(img)
 	SaveImage("img/gray.png", imgGray)
 
+	// array to gray
+	now = time.Now()
+	for i := 0; i < iteration; i++ {
+		ConvertGrayImage(ConvertArray(img).ToGrayscale())
+	}
+	timeData = append(timeData, TimeData{Name: "Array to Gray", Elapsed: int64(time.Since(now).Milliseconds() / int64(iteration))})
+	imgGray = ConvertGrayImage(ConvertArray(img).ToGrayscale())
+	SaveImage("img/array2gray.png", imgGray)
+
 	// binarization
 	now = time.Now()
 	for i := 0; i < iteration; i++ {
@@ -179,27 +237,43 @@ func main() {
 	imgBinarization := Binarization(imgGray, 128)
 	SaveImage("img/binarization.png", imgBinarization)
 
-	// simple
-	simpleMask := [][]int16{
+	// simple (3x3)
+	simpleMask3 := [][]int16{
 		{1, 1, 1},
 		{1, 1, 1},
 		{1, 1, 1},
 	}
 	now = time.Now()
 	for i := 0; i < iteration; i++ {
-		FilterGray(imgGray, simpleMask, 9, 3)
+		FilterGray(imgGray, simpleMask3, 9, 3)
 	}
-	timeData = append(timeData, TimeData{Name: "Simple(Gray)", Elapsed: int64(time.Since(now).Milliseconds() / int64(iteration))})
-	imgSimple := FilterGray(imgGray, simpleMask, 9, 3)
-	SaveImage("img/simple.png", imgSimple)
+	timeData = append(timeData, TimeData{Name: "Simple3(Gray)", Elapsed: int64(time.Since(now).Milliseconds() / int64(iteration))})
+	imgSimple3 := FilterGray(imgGray, simpleMask3, 9, 3)
+	SaveImage("img/simple.png", imgSimple3)
+
+	// simple (5x5)
+	// simpleMask5 := [][]int16{
+	// 	{1, 1, 1, 1, 1},
+	// 	{1, 1, 1, 1, 1},
+	// 	{1, 1, 1, 1, 1},
+	// 	{1, 1, 1, 1, 1},
+	// 	{1, 1, 1, 1, 1},
+	// }
+	// now = time.Now()
+	// for i := 0; i < iteration; i++ {
+	// 	FilterGray(imgGray, simpleMask5, 25, 5)
+	// }
+	// timeData = append(timeData, TimeData{Name: "Simple5(Gray)", Elapsed: int64(time.Since(now).Milliseconds() / int64(iteration))})
+	// imgSimple5 := FilterGray(imgGray, simpleMask5, 25, 5)
+	// SaveImage("img/simple5.png", imgSimple5)
 
 	// rgba filter
 	now = time.Now()
 	for i := 0; i < iteration; i++ {
-		filterRGBA(img, simpleMask, 9, 3)
+		filterRGBA(img, simpleMask3, 9, 3)
 	}
 	timeData = append(timeData, TimeData{Name: "Simple(RGBA)", Elapsed: int64(time.Since(now).Milliseconds() / int64(iteration))})
-	SaveImage("img/simpleRgba.png", filterRGBA(img, simpleMask, 9, 3))
+	SaveImage("img/simpleRgba.png", filterRGBA(img, simpleMask3, 9, 3))
 
 	// gaussian
 	gaussianMask := [][]int16{
@@ -232,7 +306,7 @@ func main() {
 	SaveImage("img/subGaussian.png", SubPixel(imgGray, imgGaussian))
 
 	// gray - simple + 128
-	SaveImage("img/subSimple.png", SubPixel(imgGray, imgSimple))
+	SaveImage("img/subSimple.png", SubPixel(imgGray, imgSimple3))
 
 	for _, td := range timeData {
 		fmt.Printf("%-16s: %vms\n", td.Name, td.Elapsed)
