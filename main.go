@@ -55,7 +55,7 @@ func ConvertArray(src *image.RGBA) (array arrRGBAImg) {
 }
 
 func ConvertGrayImage(array arrGrayImg) *image.Gray {
-	xlen, ylen := len(array), len(array[0])
+	xlen, ylen := array.GetSize()
 	rect := image.Rect(0, 0, xlen, ylen)
 	dst := image.NewGray(rect)
 	for x := 0; x < xlen; x++ {
@@ -67,7 +67,7 @@ func ConvertGrayImage(array arrGrayImg) *image.Gray {
 }
 
 func ConvertRGBAImage(array arrRGBAImg) *image.RGBA {
-	xlen, ylen := len(array), len(array[0])
+	xlen, ylen := array.GetSize()
 	rect := image.Rect(0, 0, xlen, ylen)
 	dst := image.NewRGBA(rect)
 	for x := 0; x < xlen; x++ {
@@ -78,12 +78,35 @@ func ConvertRGBAImage(array arrRGBAImg) *image.RGBA {
 	return dst
 }
 
-func (src arrGrayImg) FlipHorizontal() (dst arrGrayImg) {
-	xlen, ylen := len(src), len(src[0])
-	dst = make(arrGrayImg, xlen)
+func AllocGrayArray(x, y int) (dst arrGrayImg) {
+	dst = make(arrGrayImg, x)
 	for i := 0; i < len(dst); i++ {
-		dst[i] = make([]color.Gray, ylen)
+		dst[i] = make([]color.Gray, y)
 	}
+	return
+}
+
+func AllocRGBAArray(x, y int) (dst arrRGBAImg) {
+	dst = make(arrRGBAImg, x)
+	for i := 0; i < len(dst); i++ {
+		dst[i] = make([]color.RGBA, y)
+	}
+	return
+}
+
+func (src arrGrayImg) GetSize() (x int, y int) {
+	x, y = len(src), len(src[0])
+	return
+}
+
+func (src arrRGBAImg) GetSize() (x int, y int) {
+	x, y = len(src), len(src[0])
+	return
+}
+
+func (src arrGrayImg) FlipHorizontal() (dst arrGrayImg) {
+	xlen, ylen := src.GetSize()
+	dst = AllocGrayArray(xlen, ylen)
 	for x := 0; x < xlen; x++ {
 		for y := 0; y < ylen; y++ {
 			dst[x][y] = color.Gray{uint8(src[xlen-x-1][y].Y)}
@@ -93,11 +116,8 @@ func (src arrGrayImg) FlipHorizontal() (dst arrGrayImg) {
 }
 
 func (src arrGrayImg) FlipVertical() (dst arrGrayImg) {
-	xlen, ylen := len(src), len(src[0])
-	dst = make(arrGrayImg, xlen)
-	for i := 0; i < len(dst); i++ {
-		dst[i] = make([]color.Gray, ylen)
-	}
+	xlen, ylen := src.GetSize()
+	dst = AllocGrayArray(xlen, ylen)
 	for x := 0; x < xlen; x++ {
 		for y := 0; y < ylen; y++ {
 			dst[x][y] = color.Gray{uint8(src[x][ylen-y-1].Y)}
@@ -107,11 +127,8 @@ func (src arrGrayImg) FlipVertical() (dst arrGrayImg) {
 }
 
 func (src arrRGBAImg) ToGrayscale() (dst arrGrayImg) {
-	xlen, ylen := len(src), len(src[0])
-	dst = make(arrGrayImg, xlen)
-	for i := 0; i < len(dst); i++ {
-		dst[i] = make([]color.Gray, ylen)
-	}
+	xlen, ylen := src.GetSize()
+	dst = AllocGrayArray(xlen, ylen)
 	for x := 0; x < xlen; x++ {
 		for y := 0; y < ylen; y++ {
 			pix := src[x][y]
@@ -123,11 +140,8 @@ func (src arrRGBAImg) ToGrayscale() (dst arrGrayImg) {
 }
 
 func (src arrGrayImg) ToBinarize(threshold uint8) (dst arrGrayImg) {
-	xlen, ylen := len(src), len(src[0])
-	dst = make(arrGrayImg, xlen)
-	for i := 0; i < len(dst); i++ {
-		dst[i] = make([]color.Gray, ylen)
-	}
+	xlen, ylen := src.GetSize()
+	dst = AllocGrayArray(xlen, ylen)
 	for x := 0; x < xlen; x++ {
 		for y := 0; y < ylen; y++ {
 			gray := uint8(src[x][y].Y)
@@ -143,16 +157,13 @@ func (src arrGrayImg) ToBinarize(threshold uint8) (dst arrGrayImg) {
 }
 
 func (src arrGrayImg) Filter(mask [][]float64) (dst arrGrayImg) {
-	xlen, ylen := len(src), len(src[0])
+	xlen, ylen := src.GetSize()
+	dst = AllocGrayArray(xlen, ylen)
 	mxlen, mylen := len(mask), len(mask[0])
 	if mxlen != mylen {
 		return nil
 	}
 	margin := mxlen / 2
-	dst = make(arrGrayImg, xlen)
-	for i := 0; i < len(dst); i++ {
-		dst[i] = make([]color.Gray, ylen)
-	}
 	for x := 0; x < xlen; x++ {
 		for y := 0; y < ylen; y++ {
 			pValue := 0.0
