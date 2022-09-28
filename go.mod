@@ -1,3 +1,3 @@
-module github.com/broccolingual/golang-dev-template
+module github.com/broccolingual/go-img-lib
 
 go 1.19

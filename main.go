@@ -54,6 +54,18 @@ func ConvertArray(src *image.RGBA) (array arrRGBAImg) {
 	return
 }
 
+func ConvertGrayArray(src *image.Gray) (array arrGrayImg) {
+	size := src.Bounds().Size()
+	for i := 0; i < size.X; i++ {
+		var y []color.Gray
+		for j := 0; j < size.Y; j++ {
+			y = append(y, src.At(i, j).(color.Gray))
+		}
+		array = append(array, y)
+	}
+	return
+}
+
 func ConvertGrayImage(array arrGrayImg) *image.Gray {
 	xlen, ylen := array.GetSize()
 	rect := image.Rect(0, 0, xlen, ylen)
@@ -195,11 +207,29 @@ func SubPixel(src1 *image.Gray, src2 *image.Gray) *image.Gray {
 	return dst
 }
 
+func (src arrGrayImg) ImageProc(threshold int) (dst arrGrayImg) {
+	xlen, ylen := src.GetSize()
+	dst = AllocGrayArray(xlen, ylen)
+	for x := 0; x < xlen-1; x++ {
+		for y := 0; y < ylen; y++ {
+			pValue := int(src[x][y].Y) - int(src[x+1][y].Y)
+			gray := uint8(0)
+			if pValue > threshold {
+				gray = 255
+			} else if pValue < -threshold {
+				gray = 128
+			}
+			dst[x][y] = color.Gray{gray}
+		}
+	}
+	return
+}
+
 func main() {
 	path := "img/lenna.png"
 	img := LoadRGBAImage(path)
 	timeData := []TimeData{}
-	iteration := 5
+	iteration := 1
 	fmt.Printf("%s (%dx%d)\nAverage Elapsed Time(Iteration: %d)\n", path, img.Bounds().Dx(), img.Bounds().Dy(), iteration)
 
 	// grayscale
@@ -294,6 +324,10 @@ func main() {
 
 	// gray - simple5 + 128
 	SaveImage("img/subSimple5.png", SubPixel(imgGray, imgSimple5))
+
+	// test
+	imgOut := ConvertGrayArray(SubPixel(imgGray, imgGaussian))
+	SaveImage("img/test.png", ConvertGrayImage(imgOut.ImageProc(24)))
 
 	for _, td := range timeData {
 		fmt.Printf("%-16s: %vms\n", td.Name, td.Elapsed)
